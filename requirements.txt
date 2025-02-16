@@ -1,6 +1,1 @@
-pip install gunicorn
-
-git add requirements.txt
-git commit -m "Added gunicorn"
-git push origin main
 
