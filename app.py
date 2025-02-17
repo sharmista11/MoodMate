@@ -6,6 +6,9 @@ from flask import Flask, request, jsonify
 from nltk.stem import WordNetLemmatizer
 from tensorflow import keras
 from tensorflow.keras import layers
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppresses unnecessary TensorFlow logs
+import tensorflow as tf
 
 # Initialize Flask app
 app = Flask(__name__)
