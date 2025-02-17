@@ -14,9 +14,7 @@ import tensorflow as tf
 # Initialize Flask app
 app = Flask(__name__)
 port = int(os.getenv("PORT", 10000))
-from flask_cors import CORS
-app = Flask(__name__)
-CORS(app) 
+ 
 # Download NLTK resources
 nltk.download('punkt_tab')
 nltk.download('wordnet')
