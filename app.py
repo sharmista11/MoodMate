@@ -13,12 +13,14 @@ import tensorflow as tf
 
 # Initialize Flask app
 app = Flask(__name__)
-
+port = int(os.getenv("PORT", 10000))
+from flask_cors import CORS
+app = Flask(__name__)
+CORS(app) 
 # Download NLTK resources
 nltk.download('punkt_tab')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
-
 # Load dataset
 lemmatizer = WordNetLemmatizer()
 with open('intent.json', 'r') as file:
@@ -80,9 +82,11 @@ def preprocess_input(user_input):
     return np.array([bag])
 
 # Flask API Route
-@app.route('/chat', methods=['POST'])
-def chat():
+@app.route('/', methods=['POST'])
+def chat(): 
     user_input = request.json.get("message", "")
+    bot_response = "This is a dummy response"
+    return jsonify({"response": bot_response})
 
     if not user_input:
         return jsonify({"response": "Please provide a message"}), 400
@@ -104,4 +108,4 @@ def chat():
 
 # Run the Flask app on port 5000
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host='0.0.0.0', port=port, debug=True)
