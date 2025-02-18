@@ -1,109 +1,111 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MoodMate Chatbot</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f4f4f4;
-        }
-        .chat-container {
-            width: 50%;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-        }
-        .chat-box {
-            height: 300px;
-            overflow-y: scroll;
-            border: 1px solid #ccc;
-            padding: 10px;
-            background: #fff;
-            text-align: left;
-        }
-        .chat-box p {
-            padding: 5px;
-            margin: 5px 0;
-            border-radius: 5px;
-        }
-        .user-msg {
-            background-color: #e3f2fd;
-        }
-        .bot-msg {
-            background-color: #c8e6c9;
-        }
-        input {
-            padding: 10px;
-            width: 70%;
-        }
-        button {
-            padding: 10px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-    </style>
-</head>
-<body>
-    <div class="chat-container">
-        <h2>MoodMate Chatbot</h2>
-        <div class="chat-box" id="chatBox"></div>
-        <input type="text" id="userInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-        <button onclick="sendMessage()">Send</button>
-    </div>
-    <script>
-        function sendMessage() {
-            let userInput = document.getElementById("userInput").value;
-            let chatBox = document.getElementById("chatBox");
-            if (userInput.trim() === "") {
-                alert("Please enter a message!");
-                return;
-            }
-    
-            chatBox.insertAdjacentHTML('beforeend', `<p class="user-msg"><strong>You:</strong> ${userInput}</p>`);
-            document.getElementById("userInput").value = "";
-    
-            fetch("https://moodmate-12.onrender.com", { 
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: userInput })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log(data);  // Log the response for debugging
-                if (data && data.response) {
-                    chatBox.insertAdjacentHTML('beforeend', `<p class="bot-msg"><strong>Bot:</strong> ${data.response}</p>`);
-                } else {
-                    chatBox.insertAdjacentHTML('beforeend', `<p class="bot-msg"><strong>Bot:</strong> Sorry, I didn't understand that.</p>`);
-                }
-                chatBox.scrollTop = chatBox.scrollHeight;
-            })
-            .catch(error => {
-                console.error("Error:", error);
-                chatBox.insertAdjacentHTML('beforeend', `<p class="bot-msg"><strong>Bot:</strong> There was an error processing your message. Please try again.</p>`);
-                chatBox.insertAdjacentHTML('beforeend', `<p class="bot-msg"><strong>Error Details:</strong> ${error.message}</p>`);
-            });
-        }
-    
-        function handleKeyPress(event) {
-            if (event.key === "Enter") {
-                sendMessage();
-            }
-        }
-    </script>
-</body>
-</html>
+import json
+import random
+import nltk
+import numpy as np
+from flask import Flask, request, jsonify
+from nltk.stem import WordNetLemmatizer
+from tensorflow import keras
+from tensorflow.keras import layers
+import os
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"  # Disable GPU
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'  # Suppress TensorFlow warnings
+import tensorflow as tf
+
+# Initialize Flask app
+app = Flask(__name__)
+port = int(os.getenv("PORT", 10000))
+
+# Download NLTK resources
+nltk.download('punkt')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+# Load dataset
+lemmatizer = WordNetLemmatizer()
+with open('intent.json', 'r') as file:
+    intents = json.load(file)
+
+# Preprocess data
+training_sentences = []
+training_labels = []
+classes = []
+all_words = []
+
+for intent in intents['intents']:
+    for pattern in intent['patterns']:
+        word_list = nltk.word_tokenize(pattern)
+        words = [lemmatizer.lemmatize(word.lower()) for word in word_list]
+        training_sentences.append(words)
+        training_labels.append(intent['tag'])
+        all_words.extend(words)
+
+    if intent['tag'] not in classes:
+        classes.append(intent['tag'])
+
+# Remove duplicates and sort
+all_words = sorted(set(all_words))
+classes = sorted(classes)
+
+# Prepare training data
+X_train = []
+y_train = []
+
+for sentence in training_sentences:
+    bag = [1 if word in sentence else 0 for word in all_words]
+    X_train.append(bag)
+
+for label in training_labels:
+    y_train.append(classes.index(label))
+
+X_train = np.array(X_train)
+y_train = np.array(y_train)
+
+# Build model
+model = keras.Sequential([
+    keras.Input(shape=(len(X_train[0]),)),  # Define input shape
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(64, activation='relu'),
+    layers.Dropout(0.3),
+    layers.Dense(len(classes), activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
+model.fit(X_train, y_train, epochs=100, batch_size=10, verbose=0)  # Train the model
+
+# Function to preprocess user input
+def preprocess_input(user_input):
+    """Converts user input into a bag-of-words vector."""
+    user_words = nltk.word_tokenize(user_input)
+    user_words = [lemmatizer.lemmatize(word.lower()) for word in user_words]
+    bag = [1 if word in user_words else 0 for word in all_words]
+    return np.array([bag])
+
+@app.route('/', methods=['GET', 'POST'])
+def chat():
+    if request.method == 'GET':
+        return jsonify({"message": "MoodMate Chatbot is running!"})
+
+    user_input = request.json.get("message", "")
+    if not user_input:
+        return jsonify({"response": "Please provide a message"}), 400
+
+    user_bag = preprocess_input(user_input)
+    prediction = model.predict(user_bag, verbose=0)
+    response_index = np.argmax(prediction)
+    confidence = prediction[0][response_index]
+
+    if confidence > 0.7:
+        response_tag = classes[response_index]
+
+        for intent in intents['intents']:
+            if intent['tag'] == response_tag:
+                response = random.choice(intent['responses'])
+                return jsonify({"response": response})
+
+    return jsonify({"response": "I'm sorry, I didn't understand that. Can you rephrase?"})
+
+# Run the Flask app
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000, debug=True)
