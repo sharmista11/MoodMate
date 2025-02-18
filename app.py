@@ -17,7 +17,7 @@ app = Flask(__name__)
 port = int(os.getenv("PORT", 10000))
 
 # Download NLTK resources
-nltk.download('punkt')
+nltk.download('punkt_tab')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
 
@@ -72,7 +72,7 @@ model = keras.Sequential([
 ])
 
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-model.fit(X_train, y_train, epochs=100, batch_size=10, verbose=0)  # Train the model
+model.fit(X_train, y_train, epochs=200, batch_size=8, verbose=1)  # Train the model
 
 # Function to preprocess user input
 def preprocess_input(user_input):
